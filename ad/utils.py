@@ -341,7 +341,5 @@ def plot_evaluation_plots(model, X, y, figsize=(12, 10)):
     plt.title('Calibration Curve')
     plt.legend()
 
-    
-
     plt.tight_layout()
     plt.show()

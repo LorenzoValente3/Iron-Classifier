@@ -8,18 +8,18 @@ from tensorflow.keras.regularizers import *
 from sklearn.model_selection import train_test_split
 
 import tensorflow_addons as tfa
-from typing import List
 
 
 class EnsembleFFNN(keras.Model):
     """Ensemble FeedForward Neural Networks Models"""
 
-    def __init__(self, num_models=3, 
-                 num_classes=3, name=None, 
-                 learning_rates=None, 
-                 batch_sizes=None, 
-                 kernel_initializers=None, 
-                 **kwargs):
+    def __init__(self, 
+                        num_models: int = 1, 
+                        num_classes: int =3,  
+                        learning_rates: float = None, 
+                        batch_sizes: int = None, 
+                        name = None,
+                        **kwargs):
         super().__init__(name=name)
 
         self.num_models = num_models
@@ -33,18 +33,20 @@ class EnsembleFFNN(keras.Model):
         if batch_sizes is None:
             batch_sizes = [256] * num_models  # Default batch size is 256 for all models
 
-        if kernel_initializers is None:
-            kernel_initializers = ['he_uniform'] * num_models  # Default kernel initializer is 'he_uniform' for all models
-
         self.learning_rates = learning_rates
         self.batch_sizes = batch_sizes
-        self.kernel_initializers = kernel_initializers
 
         for i in range(num_models):
             model = self.build_network(**kwargs.pop('network', {}),
                                       #kernel_initializer=kernel_initializers[i]
                                        )
             self.models.append(model)
+
+        self.metrics = ['accuracy', 
+                        keras.metrics.AUC(name='AUC'),
+                        keras.metrics.Precision(name='prec'), 
+                        keras.metrics.Recall(name='rec'),
+                        tfa.metrics.F1Score(num_classes=self.num_classes, average='weighted', name='f1')]
 
     def build_network(self, input_shape=(1028,), layer_sizes=[128, 64], kernel_regularizer=None,
                       BN=True, PRelu=True, kernel_initializer='he_uniform', dropout_rate=None):
@@ -77,9 +79,17 @@ class EnsembleFFNN(keras.Model):
 
         return tf.keras.Model(inputs=input, outputs=output, name='Classifier')
 
-    def train(self, X, y, epochs=30, callbacks=None, optimizer='adam', loss='categorical_crossentropy'):
-        if callbacks is None:
-            callbacks = []
+    def train(self, X, y, epochs=30, callbacks=None, loss='categorical_crossentropy'):
+        
+        early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', verbose=True, patience=4,
+                                              restore_best_weights=True)
+        reduceLR = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, verbose=1)
+        model_checkpoint = keras.callbacks.ModelCheckpoint('./weights/MultiFFNN/model_weights.h5', 
+                                        save_best_only=True,
+                                        monitor='val_loss',
+                                        mode='max',
+                                        verbose=1)
+        callbacks=[early_stop, model_checkpoint, reduceLR]
 
         self.history = []
 
@@ -90,7 +100,7 @@ class EnsembleFFNN(keras.Model):
                                                                                       random_state=i+1)
 
             # Compile the model
-            model.compile(optimizer=optimizer, loss=loss, metrics=self.metrics)
+            model.compile(optimizer=tf.keras.optimizers.Adam(self.learning_rates[i]), loss=loss, metrics=self.metrics)
 
             # Train the model on the specific split
             history = model.fit(X_train_split, y_train_split,
