@@ -180,7 +180,7 @@ def WhiskerWeights(model, figsize=(6, 3)):
     
     plt.show()
 
-def plot_metrics(model, metric='accuracy', figsize=(3, 3)):
+def plot_metrics(model, metric='accuracy', figsize=(2, 2)):
     """Function for plotting the trend of different metrics"""
     if metric not in model.history:
         print(f"Metric '{metric}' not found in model history.")
@@ -199,10 +199,7 @@ def plot_metrics(model, metric='accuracy', figsize=(3, 3)):
     #plt.grid(True)
     plt.show()
 
-def visualize_class_distribution(model, X, y, figsize=(6, 3), true_color='blue', predicted_color='red'):
-    # Make predictions using the trained model
-    predictions = model.predict(X)  # X is your input data
-
+def visualize_class_distribution( y, predictions, figsize=(3, 4), true_color='blue', predicted_color='red'):
     # Get the predicted class labels
     predicted_labels = np.argmax(predictions, axis=1)  # Assuming one-hot encoded labels
 
@@ -212,7 +209,7 @@ def visualize_class_distribution(model, X, y, figsize=(6, 3), true_color='blue',
 
     # Calculate the class counts for predicted labels
     predicted_class_counts = np.bincount(predicted_labels)
-    predicted_class_labels = ['p', 'He', 'Fe']
+    predicted_class_labels = true_class_labels
 
     # Plot the distribution of true class labels
     plt.figure(figsize=figsize)
@@ -230,13 +227,12 @@ def visualize_class_distribution(model, X, y, figsize=(6, 3), true_color='blue',
     plt.ylabel('Count')
     plt.title('Predicted Class Distribution')
     plt.yscale('log')
+
     plt.tight_layout()
     plt.show()
 
-def plot_auc_with_confusion_matrix(model, X, y, figsize=(12, 5)):
-    # Make predictions using the model
-    predictions = model.predict(X)
-    
+
+def plot_auc( y, predictions, figsize=(5, 5)):
     # Calculate the AUC score for each class
     num_classes = y.shape[1]
     auc_scores = []
@@ -247,38 +243,46 @@ def plot_auc_with_confusion_matrix(model, X, y, figsize=(12, 5)):
     # Compute false positive rate and true positive rate for ROC curve
     fpr, tpr, _ = roc_curve(y.ravel(), predictions.ravel())
     
-    # Create subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
-
     # Plot ROC curve
-    ax1.plot(fpr, tpr, label=f'AUC = {np.mean(auc_scores)*100:.2f} %')
-    ax1.plot([0, 1], [0, 1], 'k--')
-    ax1.set_xlabel('False Positive Rate')
-    ax1.set_ylabel('True Positive Rate')
-    ax1.set_title('Receiver Operating Characteristic')
-    ax1.legend()
+    plt.figure(figsize=figsize)
+    plt.plot(fpr, tpr, label=f'AUC = {np.mean(auc_scores)*100:.2f} %')
+    plt.plot([0, 1], [0, 1], 'k--', label='Baseline')
+    plt.plot([0, 0, 1], [0, 1, 1], 'r--', label='Perfect Classifier')
+    plt.xlabel('Background efficiency (FPR)')
+    plt.ylabel('Signal efficiency (TPR)')
+    plt.title('Receiver Operating Characteristic (ROC)')
+    plt.legend()
     
     # Add AUC scores to the plot
     class_labels = ['p', 'He', 'Fe']
     for i, auc in enumerate(auc_scores):
-        ax1.text(0.5, 0.3-i*0.05, f'AUC class {class_labels[i]} = {auc*100:.2f} %', 
+        plt.text(0.5, 0.3-i*0.05, f'AUC class {class_labels[i]} = {auc*100:.2f} %', 
                 horizontalalignment='left', verticalalignment='center')
+    
+    plt.show()
 
+
+def plot_confusion_matrix(y, predictions, num_classes=3, figsize=(3,3)):
+    
     # Compute and plot the confusion matrix
     y_pred = np.argmax(predictions, axis=1)
     y_true = np.argmax(y, axis=1)
     cm = confusion_matrix(y_true, y_pred)
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Greens', cbar=False, ax=ax2)
-    ax2.set_xlabel('Predicted Labels')
-    ax2.set_ylabel('True Labels')
-    ax2.set_title('Confusion Matrix')
-    ax2.set_xticks(np.arange(num_classes) + 0.5)
-    ax2.set_yticks(np.arange(num_classes) + 0.5)
-    ax2.set_xticklabels(class_labels)
-    ax2.set_yticklabels(class_labels)
+    
+    # Plot confusion matrix
+    plt.figure(figsize=figsize)
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Greens', cbar=False)
+    plt.xlabel('Predicted Labels')
+    plt.ylabel('True Labels')
+    plt.title('Confusion Matrix')
+    
+    class_labels = ['p', 'He', 'Fe']
+    plt.xticks(np.arange(num_classes) + 0.5, class_labels)
+    plt.yticks(np.arange(num_classes) + 0.5, class_labels)
     
     plt.tight_layout()
     plt.show()
+
 
 def plot_evaluation_plots(model, X, y, figsize=(12, 10)):
     # Make predictions using the trained model
