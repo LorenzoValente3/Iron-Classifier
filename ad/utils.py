@@ -14,6 +14,26 @@ import seaborn as sns
 def free_mem():
     return gc.collect()
 
+def reload_models(num_models, model_folder_path):
+    models = []
+
+    for i in range(num_models):
+        model_path = os.path.join(model_folder_path, f"model_{i+1}_latest")
+        model_architecture_path = os.path.join(model_path, 'model_architecture.json')
+        model_weights_path = os.path.join(model_path, 'model_weights.h5')
+
+        # Load model architecture from JSON file
+        with open(model_architecture_path, 'r') as f:
+            model_json = f.read()
+        model = tf.keras.models.model_from_json(model_json)
+
+        # Load model weights
+        model.load_weights(model_weights_path)
+
+        models.append(model)
+
+    return models
+
 def plot_histograms(data, bins=100, range=(0, 1000), ylog=False, cut=None, title=None, hnormalize=False, figsize=(6, 3)):
     # Filter the data based on the condition (value > 10)
     filt = np.where(data > 10, data, 0)

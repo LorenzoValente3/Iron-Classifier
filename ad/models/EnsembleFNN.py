@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -9,15 +8,15 @@ from sklearn.model_selection import train_test_split
 
 import tensorflow_addons as tfa
 
-
 class EnsembleFFNN(keras.Model):
     """Ensemble FeedForward Neural Networks Models"""
 
     def __init__(self, 
                         num_models: int = 1, 
-                        num_classes: int =3,  
+                        num_classes: int = 3,  
                         learning_rates: float = None, 
                         batch_sizes: int = None, 
+                        kernel_initializers = None,
                         name = None,
                         **kwargs):
         super().__init__(name=name)
@@ -33,16 +32,20 @@ class EnsembleFFNN(keras.Model):
         if batch_sizes is None:
             batch_sizes = [256] * num_models  # Default batch size is 256 for all models
 
+        if kernel_initializers is None:
+            kernel_initializers = ['he_uniform'] * num_models  # Default kernel initializer is 'he_uniform' for all models
+
         self.learning_rates = learning_rates
         self.batch_sizes = batch_sizes
+        self.kernel_initializers = kernel_initializers
 
         for i in range(num_models):
             model = self.build_network(**kwargs.pop('network', {}),
-                                      #kernel_initializer=kernel_initializers[i]
+                                      kernel_initializer=kernel_initializers[i]
                                        )
             self.models.append(model)
 
-        self.metrics = ['accuracy', 
+        self.evaluation_metrics = ['accuracy', 
                         keras.metrics.AUC(name='AUC'),
                         keras.metrics.Precision(name='prec'), 
                         keras.metrics.Recall(name='rec'),
@@ -81,26 +84,29 @@ class EnsembleFFNN(keras.Model):
 
     def train(self, X, y, epochs=30, callbacks=None, loss='categorical_crossentropy'):
         
-        early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', verbose=True, patience=4,
-                                              restore_best_weights=True)
-        reduceLR = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, verbose=1)
-        model_checkpoint = keras.callbacks.ModelCheckpoint('./weights/MultiFFNN/model_weights.h5', 
-                                        save_best_only=True,
-                                        monitor='val_loss',
-                                        mode='max',
-                                        verbose=1)
-        callbacks=[early_stop, model_checkpoint, reduceLR]
+        #early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', verbose=True, patience=4,
+        #                                      restore_best_weights=True)
+        #reduceLR = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, verbose=1)
+        #model_checkpoint = keras.callbacks.ModelCheckpoint('./weights/MultiFFNN/model_weights.h5', 
+        #                                save_best_only=True,
+        #                                monitor='val_loss',
+        #                                mode='max',
+        #                                verbose=1)
+        #callbacks=[early_stop, model_checkpoint, reduceLR]
 
         self.history = []
 
         for i, model in enumerate(self.models):
             print(f"\nTraining Model {i+1}")
             # Create a new train-validation split for each model
-            X_train_split, X_val_split, y_train_split, y_val_split = train_test_split(X, y, test_size=0.25,
+            X_train_split, X_val_split, y_train_split, y_val_split = train_test_split(X, y, 
+                                                                                      test_size=0.25,
                                                                                       random_state=i+1)
 
             # Compile the model
-            model.compile(optimizer=tf.keras.optimizers.Adam(self.learning_rates[i]), loss=loss, metrics=self.metrics)
+            model.compile(optimizer='adam',#tf.keras.optimizers.Adam(self.learning_rates[i]), 
+                          loss=loss, 
+                          metrics=self.evaluation_metrics)
 
             # Train the model on the specific split
             history = model.fit(X_train_split, y_train_split,
@@ -114,8 +120,7 @@ class EnsembleFFNN(keras.Model):
             self.save_model(model, i)
 
     def save_model(self, model, index):
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        folder_path = f"./weights/MultiFFNN/model_{index+1}_{timestamp}"
+        folder_path = f"./weights/MultiFFNN/model_{index+1}_latest"
         os.makedirs(folder_path, exist_ok=True)
 
         # Save model architecture
@@ -143,7 +148,6 @@ class EnsembleFFNN(keras.Model):
             accuracies.append(accuracy)
 
         return losses, accuracies
-
 
     def predict(self, X):
         predictions = [model.predict(X) for model in self.models]
