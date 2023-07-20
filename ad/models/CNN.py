@@ -6,8 +6,10 @@ from tensorflow.keras.layers import *
 from tensorflow.keras import regularizers
 
 
+
 class CNN(keras.Model):
-    """Convolutional Neural Network Model"""
+    """TODO: Convolutional Neural Network Model.
+        The model has to be developed further for a proper implementation"""
 
     def __init__(self, num_classes: int = 3, name=None, **kwargs):
         super().__init__(name=name)
